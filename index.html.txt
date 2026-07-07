@@ -1,0 +1,461 @@
+這是一份為您量身打造的單一 HTML 檔案。我已將**視覺樣式（CSS）**、互動邏輯（JavaScript）**以及**音效合成（Web Audio API）全部整合在其中。您只需要將以下程式碼複製，貼上並存檔為 `index.html`，點擊兩下即可在任何瀏覽器中開啟體驗。
+
+為了完美還原書中的「情緒陷阱」，我特別設計了以下機制：
+
+1. **內建音效合成**：不需要外連音檔，程式會自動用瀏覽器合成出前期的「愉悅叮咚聲（帕夫洛夫的獎勵）」與後期的「刺耳叭叭聲（世界崩壞的警告）」。
+2. **陷阱題設計**：完全依照您書中描述的節奏，前 4 題固定為「顏色」規則建立儀式感，第 5 題無預警切換規則，並帶有錯誤時的視覺震動回饋。
+
+請複製以下程式碼：
+
+```html
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>【規則變了，你還清醒嗎？】思想解剖實驗</title>
+    <style>
+        :root {
+            --bg-color: #0f1014;
+            --text-color: #e2e2e2;
+            --accent-color: #4a90e2;
+            --wrong-color: #e74c3c;
+            --correct-color: #2ecc71;
+            --card-bg: #1c1d22;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: "Helvetica Neue", Helvetica, "PingFang TC", "LiHei Pro", "Hiragino Sans GB", "Microsoft JhengHei", sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+            line-height: 1.6;
+        }
+
+        #app {
+            width: 100%;
+            max-width: 600px;
+            padding: 2rem;
+            text-align: center;
+        }
+
+        /* 視圖切換 */
+        .view {
+            display: none;
+            animation: fadeIn 0.8s ease-in-out;
+        }
+        .view.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* 文字排版 */
+        h1 {
+            font-size: 1.8rem;
+            font-weight: 300;
+            margin-bottom: 1.5rem;
+            letter-spacing: 2px;
+        }
+        p {
+            font-size: 1rem;
+            color: #a0a0a0;
+            margin-bottom: 2rem;
+        }
+        .quote {
+            font-size: 1.2rem;
+            font-style: italic;
+            color: #d0d0d0;
+            border-left: 3px solid var(--accent-color);
+            padding-left: 1rem;
+            margin: 2rem 0;
+            text-align: left;
+        }
+
+        /* 按鈕設計 */
+        button {
+            background-color: transparent;
+            color: var(--text-color);
+            border: 1px solid var(--text-color);
+            padding: 12px 24px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            letter-spacing: 1px;
+            border-radius: 4px;
+        }
+        button:hover {
+            background-color: var(--text-color);
+            color: var(--bg-color);
+        }
+        .cta-btn {
+            background-color: var(--accent-color);
+            border-color: var(--accent-color);
+            color: #fff;
+            margin-top: 1rem;
+        }
+        .cta-btn:hover {
+            background-color: #357abd;
+            border-color: #357abd;
+            color: #fff;
+        }
+
+        /* 遊戲區域 */
+        .game-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 2rem;
+            font-size: 0.9rem;
+            color: #888;
+        }
+        .card-container {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 3rem;
+        }
+        .target-container {
+            display: flex;
+            justify-content: center;
+            margin-top: 2rem;
+        }
+        .card {
+            width: 80px;
+            height: 120px;
+            background-color: var(--card-bg);
+            border: 1px solid #333;
+            border-radius: 8px;
+            display: flex;
+            flex-wrap: wrap;
+            align-content: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+            padding: 10px;
+        }
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+            border-color: var(--accent-color);
+        }
+        .card.target-card {
+            width: 100px;
+            height: 150px;
+            cursor: default;
+            border-color: #666;
+            transform: none;
+            box-shadow: 0 0 20px rgba(255,255,255,0.05);
+        }
+        
+        .shape {
+            width: 20px;
+            height: 20px;
+            margin: 2px;
+        }
+
+        /* 動畫回饋 */
+        .shake {
+            animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both;
+            border-color: var(--wrong-color) !important;
+        }
+        .flash-correct {
+            border-color: var(--correct-color) !important;
+            box-shadow: 0 0 15px var(--correct-color) !important;
+        }
+
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-2px, 0, 0); }
+            20%, 80% { transform: translate3d(4px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-6px, 0, 0); }
+            40%, 60% { transform: translate3d(6px, 0, 0); }
+        }
+
+        /* 結果頁 */
+        .result-box {
+            background-color: var(--card-bg);
+            padding: 2rem;
+            border-radius: 8px;
+            border: 1px solid #333;
+            text-align: left;
+        }
+        .result-title {
+            color: var(--accent-color);
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+<div id="app">
+    <div id="introView" class="view active">
+        <h1>【規則變了，你還清醒嗎？】</h1>
+        <div class="quote">
+            「你引以為傲的『價值觀』，是深思熟慮的結果，還是一場大腦停不下來的盲從？」
+        </div>
+        <p>這是一場源自神經心理學的認知實驗。<br>請戴上耳機，或開啟聲音。測驗耗時約 60 秒。</p>
+        <button onclick="startGame()">解剖你的思想彈性</button>
+    </div>
+
+    <div id="gameView" class="view">
+        <div class="game-header">
+            <span id="roundCounter">回合: 1 / 12</span>
+            <span>請將下方卡片，歸類到上方最適合的位置</span>
+        </div>
+        
+        <div class="card-container" id="standardCards">
+            </div>
+
+        <div style="border-top: 1px dashed #333; margin: 2rem 0;"></div>
+
+        <div class="target-container" id="targetCardContainer">
+            </div>
+    </div>
+
+    <div id="resultView" class="view">
+        <h1>測驗結束：意識形態大解密</h1>
+        <div class="result-box">
+            <h2 class="result-title" id="resultType">計算中...</h2>
+            <p id="resultDesc" style="color: #ccc; margin-bottom: 1rem;"></p>
+            <div style="border-top: 1px solid #333; padding-top: 1rem; margin-top: 1rem;">
+                <p style="color: #fff; font-size: 0.95rem;">
+                    <strong>新書推薦：</strong><br>
+                    你在這個彩色幾何圖形的小遊戲裡，已經偷偷洩漏了自己最深層的心理機制。當身體限制了一個人的彈性，我們該用什麼方法去維持自由？——第二章《一個小小的實驗》，帶你重新思考，你的身體是如何一步步被政治化的。
+                </p>
+            </div>
+        </div>
+        <div style="margin-top: 2rem; display: flex; flex-direction: column; gap: 10px;">
+            <button class="cta-btn" onclick="alert('連結至博客來/誠品購書頁面')">立刻購買《新書書名》找回認知自由</button>
+            <button onclick="alert('生成結果圖片供 IG/Threads 分享的功能')">分享我的思想解剖報告</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- 音效合成器 (Web Audio API) ---
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    let audioCtx;
+
+    function initAudio() {
+        if (!audioCtx) {
+            audioCtx = new AudioContext();
+        }
+    }
+
+    // 甜膩的提示音 (叮咚)
+    function playCorrectSound() {
+        if (!audioCtx) return;
+        const osc = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(880, audioCtx.currentTime); // A5
+        osc.frequency.exponentialRampToValueAtTime(1760, audioCtx.currentTime + 0.1); // 往上滑音
+        gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
+        gainNode.gain.linearRampToValueAtTime(0.3, audioCtx.currentTime + 0.05);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+        osc.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.3);
+    }
+
+    // 刺耳的警告音 (叭叭)
+    function playWrongSound() {
+        if (!audioCtx) return;
+        const osc = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(150, audioCtx.currentTime); // 低頻刺耳聲
+        gainNode.gain.setValueAtTime(0.5, audioCtx.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+        osc.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.4);
+    }
+
+    // --- 遊戲邏輯與資料 ---
+    const SHAPES = {
+        triangle: '<polygon points="10,0 20,20 0,20" fill="currentColor"/>',
+        star: '<polygon points="10,0 13,6 20,7 15,12 16,19 10,15 4,19 5,12 0,7 7,6" fill="currentColor"/>',
+        square: '<rect width="18" height="18" x="1" y="1" fill="currentColor"/>',
+        circle: '<circle cx="10" cy="10" r="9" fill="currentColor"/>'
+    };
+
+    const COLORS = {
+        red: '#e74c3c',
+        green: '#2ecc71',
+        yellow: '#f1c40f',
+        blue: '#3498db',
+        orange: '#e67e22'
+    };
+
+    // 上方固定的 4 張標準卡 (對應書中邏輯)
+    const standardCards = [
+        { id: 0, color: 'red', shape: 'triangle', count: 1 },
+        { id: 1, color: 'blue', shape: 'star', count: 2 },
+        { id: 2, color: 'yellow', shape: 'square', count: 3 },
+        { id: 3, color: 'green', shape: 'circle', count: 4 }
+    ];
+
+    // 12回合的題目與背後規則 (第5回合故意換規則)
+    const rounds = [
+        // 前4題：顏色規則 (建立控制感)
+        { rule: 'color', target: { color: 'green', shape: 'star', count: 3 } }, // 配對綠色 (標準卡3)
+        { rule: 'color', target: { color: 'red', shape: 'square', count: 2 } }, // 配對紅色 (標準卡0)
+        { rule: 'color', target: { color: 'blue', shape: 'circle', count: 1 } }, // 配對藍色 (標準卡1)
+        { rule: 'color', target: { color: 'yellow', shape: 'triangle', count: 4 } }, // 配對黃色 (標準卡2)
+        
+        // 第5~8題：規則突變為「數量」(開始打臉)
+        { rule: 'count', target: { color: 'blue', shape: 'square', count: 2 } }, // 陷阱：選藍色會錯，必須選數量2 (標準卡1)
+        { rule: 'count', target: { color: 'green', shape: 'star', count: 1 } }, // 必須選數量1 (標準卡0)
+        { rule: 'count', target: { color: 'red', shape: 'circle', count: 4 } }, // 必須選數量4 (標準卡3)
+        { rule: 'count', target: { color: 'yellow', shape: 'triangle', count: 3 } }, // 必須選數量3 (標準卡2)
+
+        // 第9~12題：規則突變為「形狀」
+        { rule: 'shape', target: { color: 'green', shape: 'triangle', count: 2 } }, // 必須選三角形 (標準卡0)
+        { rule: 'shape', target: { color: 'red', shape: 'square', count: 4 } }, // 必須選正方形 (標準卡2)
+        { rule: 'shape', target: { color: 'yellow', shape: 'star', count: 1 } }, // 必須選星星 (標準卡1)
+        { rule: 'shape', target: { color: 'blue', shape: 'circle', count: 3 } }  // 必須選圓形 (標準卡3)
+    ];
+
+    let currentRound = 0;
+    let perseverativeErrors = 0; // 固著錯誤率：規則改變後依然堅持舊規則的次數
+    let consecutiveErrors = 0;
+    let isProcessing = false;
+
+    // --- 畫面渲染 ---
+    function renderCardHTML(cardObj) {
+        let shapesHtml = '';
+        for (let i = 0; i < cardObj.count; i++) {
+            shapesHtml += `<svg class="shape" style="color: ${COLORS[cardObj.color]}" viewBox="0 0 20 20">${SHAPES[cardObj.shape]}</svg>`;
+        }
+        return shapesHtml;
+    }
+
+    function initBoard() {
+        const standardContainer = document.getElementById('standardCards');
+        standardContainer.innerHTML = '';
+        standardCards.forEach(card => {
+            const cardEl = document.createElement('div');
+            cardEl.className = 'card';
+            cardEl.innerHTML = renderCardHTML(card);
+            cardEl.onclick = () => handleCardClick(cardEl, card);
+            standardContainer.appendChild(cardEl);
+        });
+    }
+
+    function loadRound() {
+        if (currentRound >= rounds.length) {
+            endGame();
+            return;
+        }
+        document.getElementById('roundCounter').innerText = `回合: ${currentRound + 1} / 12`;
+        const targetContainer = document.getElementById('targetCardContainer');
+        const targetCardObj = rounds[currentRound].target;
+        
+        const cardEl = document.createElement('div');
+        cardEl.className = 'card target-card';
+        cardEl.innerHTML = renderCardHTML(targetCardObj);
+        
+        targetContainer.innerHTML = '';
+        targetContainer.appendChild(cardEl);
+        isProcessing = false;
+    }
+
+    // --- 互動與判定 ---
+    function handleCardClick(cardElement, selectedStandardCard) {
+        if (isProcessing) return;
+        isProcessing = true;
+
+        initAudio(); // 確保 AudioContext 在使用者互動後啟動
+
+        const currentTarget = rounds[currentRound].target;
+        const currentRule = rounds[currentRound].rule;
+
+        // 檢查是否符合當前規則
+        let isCorrect = false;
+        if (currentRule === 'color' && selectedStandardCard.color === currentTarget.color) isCorrect = true;
+        if (currentRule === 'shape' && selectedStandardCard.shape === currentTarget.shape) isCorrect = true;
+        if (currentRule === 'count' && selectedStandardCard.count === currentTarget.count) isCorrect = true;
+
+        if (isCorrect) {
+            playCorrectSound();
+            cardElement.classList.add('flash-correct');
+            consecutiveErrors = 0;
+            
+            setTimeout(() => {
+                cardElement.classList.remove('flash-correct');
+                currentRound++;
+                loadRound();
+            }, 500);
+        } else {
+            playWrongSound();
+            cardElement.classList.add('shake');
+            
+            // 紀錄固著錯誤 (在第5回合或第9回合換規則後連續答錯)
+            if (currentRound >= 4) {
+                perseverativeErrors++;
+            }
+            consecutiveErrors++;
+
+            setTimeout(() => {
+                cardElement.classList.remove('shake');
+                isProcessing = false;
+            }, 400);
+        }
+    }
+
+    // --- 流程控制 ---
+    function switchView(viewId) {
+        document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
+        document.getElementById(viewId).classList.add('active');
+    }
+
+    function startGame() {
+        initAudio();
+        currentRound = 0;
+        perseverativeErrors = 0;
+        initBoard();
+        loadRound();
+        switchView('gameView');
+    }
+
+    function endGame() {
+        switchView('resultView');
+        
+        const typeEl = document.getElementById('resultType');
+        const descEl = document.getElementById('resultDesc');
+        
+        // 根據固著錯誤率分類 (總共8題有變換規則)
+        if (perseverativeErrors <= 2) {
+            typeEl.innerText = "【自由流動的適應者】";
+            descEl.innerText = "規則一變，你雖然嚇一跳，但馬上開始尋找新規則。你的大腦認知極具彈性，在現實生活中，你能夠把「想法」和「人」分開。遇到與你不同的意識形態時，你不會本能性地感到仇恨，而是順應變局尋找解答。";
+        } else if (perseverativeErrors >= 6) {
+            typeEl.innerText = "【頑固的鐵板一塊】";
+            descEl.innerText = "被「叭叭」狂打臉也不願放手，你堅信世界總有一天會還你公道。在面對社會變化時，你討厭別人唱反調，習慣用一套固定的意識形態去套用複雜的世界。舊規則明明已經失效，你的大腦卻不願承認。";
+        } else {
+            typeEl.innerText = "【被焦慮封印的水泥型】";
+            descEl.innerText = "你在平常或許很有彈性，但一旦遇到突如其來的壓力（像是莫名其妙的叭叭聲），你的思維就會瞬間狹窄。焦慮像一層水泥，把你整個人封死在原地，讓你寧可重複錯誤的做法，也不敢跨出舒適圈尋找新規則。";
+        }
+    }
+</script>
+
+</body>
+</html>
+
+```
